@@ -10,9 +10,10 @@ class SnakeBasic:
     '''
     REWARD_FOOD_EATEN = 10
     REWARD_GAME_OVER = -10
-    REWARD_LIVED = 0
+    REWARD_LIVED = -.01
+    REWARD_LOOPED = 0
 
-    def __init__(self, arena_size: tuple = (15, 15)):
+    def __init__(self, arena_size: tuple[int, int] = (15, 15)):
         self.arena_dimensions = arena_size
         
         # set deafult
@@ -36,14 +37,16 @@ class SnakeBasic:
         for pos in self.snake_body_pos[1:]:
             self.free_spaces.remove(pos)
         
-        #
-        self.score = 0
-        #
+        # apple <3 
         self.place_apple()
         
+        # anti looping 
+        self.LOOPED_VALUE = 1.5 * self.arena_dimensions[0] * self.arena_dimensions[1]
+        self.looped = 0
         # handle death
         self.died = False
-
+        self.score = 0
+        
     def place_apple(self):
         # random pick random apple position    
         self.apple_pos = choice(self.free_spaces)
@@ -88,6 +91,7 @@ class SnakeBasic:
             # pick apple random position and del it from free spaces
             self.place_apple()
             
+            self.looped = 0
             return (SnakeBasic.REWARD_FOOD_EATEN, False, self.score)
         else:
             # add tail position to free spaces 
@@ -103,7 +107,12 @@ class SnakeBasic:
             # move head
             self.snake_body_pos[0] = self.snake_head_pos
         
-
+        # anti looping system
+        self.looped +=1
+        if (self.looped>self.LOOPED_VALUE):
+            self.died = True
+            return (SnakeBasic.REWARD_LOOPED, False, self.score)
+            
         return (SnakeBasic.REWARD_LIVED, False, self.score)
 
     def is_collision(self, point: Point):
@@ -122,10 +131,32 @@ class SnakeBasic:
             point == self.snake_body_pos[-1]:
             return True
         
-        
-        return False
+        return False  
     
-    def _get_matrix(self):
+    def _get_input_1(self):
+        matrix = [[ObjectsCodes.VOID for y in range(0, self.arena_dimensions[1])] for x in range(0, self.arena_dimensions[0])]
+        
+        # allocate snake body
+        for point in self.snake_body_pos[1:]:
+            matrix[point.x][point.y] = 1
+
+        # serialize matrix
+        matrix = [x for line in matrix for x in line]
+        
+        # apple pos
+        matrix += [self.apple_pos.x, self.apple_pos.y]
+        
+        # head pos
+        matrix += [self.snake_head_pos.x, self.snake_head_pos.y]
+        
+        # direction
+        matrix += [self.snake_direction == Direction.UP,
+                   self.snake_direction == Direction.DOWN,
+                   self.snake_direction == Direction.LEFT,
+                   self.snake_direction == Direction.RIGHT]
+                
+        return matrix
+    def _get_frame_matrix(self):
         matrix = [[ObjectsCodes.VOID for y in range(0, self.arena_dimensions[1])] for x in range(0, self.arena_dimensions[0])]
         
         # allocate snake body
@@ -133,118 +164,43 @@ class SnakeBasic:
             matrix[point.x][point.y] = ObjectsCodes.SNAKE
         
         # allocate head
-        matrix[self.snake_head_pos.x][self.snake_head_pos.y] = ObjectsCodes.SNAKE_HEAD
-        
-        # allocate apple
         matrix[self.apple_pos.x][self.apple_pos.y] = ObjectsCodes.APPLE
         
         return matrix
 
-    def _get_serialize_matrix(self):
-        matrix = self._get_matrix()
-        matrix = [cell for line in matrix for cell in line]
-        
-        return matrix
-    
-    def _get_serialize_binary_matrix(self):
-        # allocate snake body
-        snake_body = [[0 for y in range(0, self.arena_dimensions[1])] for x in range(0, self.arena_dimensions[0])]
-        for point in self.snake_body_pos:
-            snake_body[point.x][point.y] = 1
-        
-        # allocate apple
-        apple = [[0 for y in range(0, self.arena_dimensions[1])] for x in range(0, self.arena_dimensions[0])]
-        apple[self.apple_pos.x][self.apple_pos.y] = 1
-        
-        
-        # allocate head
-        head = [[0 for y in range(0, self.arena_dimensions[1])] for x in range(0, self.arena_dimensions[0])]
-        head[self.snake_head_pos.x][self.snake_head_pos.y] = 1
-        
-        out = snake_body + apple + head
-        
-        # serialize out
-        out = [x for line in out for x in line]
-        return out
-    
     def _get_nice_moves(self):
+        # nice moves list        
+        moves = []
         
-        moves = Direction.directions.copy()
         # remove going into walls
         for direction in Direction.directions:
-            if(self.is_collision(self.snake_head_pos + direction)):
-                moves.remove(direction)
-        # 
-        if not moves:
-            moves.append(Direction.UP)
+            if not (self.is_collision(self.snake_head_pos + direction)):
+                moves += [direction]
 
         # go for the apple!!!
         for direction in Direction.directions:
             if(self.apple_pos == self.snake_head_pos + direction):
-                moves += [direction] * (len(moves)//2)
+                moves += [direction] * 10
                 break
-            
+        
+        # go in direction of an apple
+        if (self.snake_head_pos.x > self.apple_pos.x):
+            moves += [Direction.LEFT] * 5
+        if (self.snake_head_pos.x < self.apple_pos.x):
+            moves += [Direction.RIGHT] * 5
+        if (self.snake_head_pos.y > self.apple_pos.y):
+            moves += [Direction.UP] * 5
+        if (self.snake_head_pos.y < self.apple_pos.y):
+            moves += [Direction.DOWN] * 5
+         
+        if not moves:
+            moves += [Direction.UP]   
+        # add other shit 
+        #moves += Direction.directions.copy()
+        
         return moves
-
-    def _get_basic_input_very(self):
-        '''
-        returns:
-        [
-            <snake_direction>[4],
-            <distance to wall>[4],
-            <apple vision - 2 axis>[4],
-            <snake body vision - 4 axis>[4],
-        ]
-        
-        '''
-       
-        # || snake direction ||
-        
-        dir_u = self.snake_direction == Direction.UP
-        dir_d = self.snake_direction == Direction.DOWN
-        dir_l = self.snake_direction == Direction.LEFT
-        dir_r = self.snake_direction == Direction.RIGHT
-        
-        point_l = self.snake_head_pos + Direction.LEFT
-        point_d = self.snake_head_pos + Direction.DOWN
-        point_r = self.snake_head_pos + Direction.RIGHT
-        point_u = self.snake_head_pos + Direction.UP
-        
-        state = [
-            # Danger straight
-            (dir_r and self.is_collision(point_r)) or 
-            (dir_l and self.is_collision(point_l)) or 
-            (dir_u and self.is_collision(point_u)) or 
-            (dir_d and self.is_collision(point_d)),
-
-            # Danger right
-            (dir_u and self.is_collision(point_r)) or 
-            (dir_d and self.is_collision(point_l)) or 
-            (dir_l and self.is_collision(point_u)) or 
-            (dir_r and self.is_collision(point_d)),
-
-            # Danger left
-            (dir_d and self.is_collision(point_r)) or 
-            (dir_u and self.is_collision(point_l)) or 
-            (dir_r and self.is_collision(point_u)) or 
-            (dir_l and self.is_collision(point_d)),
-            
-            # Move direction
-            dir_l,
-            dir_r,
-            dir_u,
-            dir_d,
-            
-            # Food location 
-            self.apple_pos.x < self.snake_head_pos.x,  # food left
-            self.apple_pos.x > self.snake_head_pos.x,  # food right
-            self.apple_pos.y < self.snake_head_pos.y,  # food up
-            self.apple_pos.y > self.snake_head_pos.y  # food down
-        ]
-        
-        return state
-    
-    def _get_basic_input(self):
+   
+    def _get_basic_input_bin(self):
         out = []
         
         # snake_direction
@@ -326,6 +282,7 @@ class SnakeBasic:
             self.apple_pos.x < self.snake_head_pos.x]
                 
         return out
+
 class SnakeExtendedBasic(SnakeBasic):
     '''
     Snake Basic but with an ability to display game in subconsole.
@@ -527,9 +484,9 @@ class Direction:
 # enum objects codes
 class ObjectsCodes:
     VOID = 0
-    SNAKE = .5
+    SNAKE = 1
     SNAKE_HEAD = 1
-    APPLE = -1
+    APPLE = 5
 
 def main():
     '''

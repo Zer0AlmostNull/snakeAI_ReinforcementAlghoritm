@@ -17,7 +17,6 @@ LR = 0.001
 
 SNAKE_DIMENSIONS = (20, 20)
 
-
 class Agent:
     def __init__(self):
         self.n_games = 0
@@ -25,11 +24,11 @@ class Agent:
         self.gamma = .9 # discount rate
         self.memory = deque(maxlen = MAX_MEMORY) # popleft
         
-        self.model = Linear_QNet((24, 256, 4))
+        self.model = Linear_QNet((24, 256, 128, 4))
         self.trainer = QTrainer(self.model, lr = LR, gamma = self.gamma)        
         
-    def get_state(self, game: SnakeBasic):
-        return np.array(game._get_basic_input(), dtype = np.int16)
+    def get_state(self, game: SnakeBasic):        
+        return np.array(game._get_basic_input_bin(), dtype = np.int)
     
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))  # popleft if MAX_MEMORY is reached
@@ -49,19 +48,19 @@ class Agent:
     def get_action(self, state, game: SnakeBasic):
         # random moves tradeoff exploratation /exploitation
         self.epsilon = 80 - self.n_games
-        final_move = 0
+        move = 0
         
         if random.randint(0, 200) < self.epsilon:
-            final_move = random.randint(0, 3)
+            move = random.randint(0, 3)
                      
             # get nice moves from game
-            # final_move = Direction.directions.index(random.choice(game._get_nice_moves()+Direction.directions))      
+            #move = Direction.directions.index(random.choice(game._get_nice_moves()))      
         else:
             state0 = torch.tensor(state, dtype=torch.float)
             prediction = self.model(state0)
-            final_move = torch.argmax(prediction).item()
+            move = torch.argmax(prediction).item()
         
-        return final_move
+        return move
             
 def train():
     #
