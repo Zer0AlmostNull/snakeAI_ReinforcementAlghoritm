@@ -11,7 +11,6 @@ class Linear_QNet(nn.Module):
         self.architecture = architecture
         self.layers = nn.ModuleList([nn.Linear(self.architecture[index], self.architecture[index + 1]) for index in range(0, len(self.architecture)-1)])
 
-        
     def forward(self, x):
         for index in range(0, len(self.layers)-1):
             x = F.relu(self.layers[index](x))
@@ -26,6 +25,13 @@ class Linear_QNet(nn.Module):
         
         file_name = os.path.join(model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
+    
+    @staticmethod
+    def load(architecture, path='./model/model.pth'):
+        model = Linear_QNet(architecture)
+        model.load_state_dict(torch.load(path))
+        model.eval()
+        return model
     
 class QTrainer:
     def __init__(self, model, lr, gamma):

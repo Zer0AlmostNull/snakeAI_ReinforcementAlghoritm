@@ -15,7 +15,7 @@ MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
 LR = 0.001
 
-SNAKE_DIMENSIONS = (20, 20)
+SNAKE_DIMENSIONS = (23, 23)
 
 class Agent:
     def __init__(self):
@@ -24,6 +24,7 @@ class Agent:
         self.gamma = .9 # discount rate
         self.memory = deque(maxlen = MAX_MEMORY) # popleft
         
+        # load model - self.model = Linear_QNet.load()
         self.model = Linear_QNet((24, 256, 128, 4))
         self.trainer = QTrainer(self.model, lr = LR, gamma = self.gamma)        
         

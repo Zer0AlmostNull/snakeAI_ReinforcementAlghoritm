@@ -1,0 +1,6 @@
+pygame==2.1.0
+matplotlib
+numpy
+torch
+torchvision
+pillow
